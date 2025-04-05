@@ -23,6 +23,7 @@
     "mssql": "^11.0.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.15",
+    "otp-generator": "^4.0.1",
     "path": "^0.12.7",
     "pdfkit": "^0.15.0",
     "pm2": "^5.4.2"

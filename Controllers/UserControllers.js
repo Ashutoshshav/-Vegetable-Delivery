@@ -1,5 +1,6 @@
 const { connectDB, sql } = require("../Utils/Connection");
-let { setToken, getUser } = require("../Services/UserAuthentication")
+let { setToken, getUser, getOTP, storeOTP, checkOTP } = require("../Services/UserAuthentication")
+let { handleSendEmail } = require("../Services/SendEmail")
 
 async function handleUserSignup(req, res) {
     let { Cust_ID, name, mobileno, email, address, gstno, password } = req.body;
@@ -15,16 +16,16 @@ async function handleUserSignup(req, res) {
         const pool = await connectDB()
 
         const fetchUser = await pool.request()
-            .input('Email', sql.VarChar, Email) 
-            .input('MobNo', sql.VarChar, MobNo)  
+            .input('Email', sql.VarChar, Email)
+            .input('MobNo', sql.VarChar, MobNo)
             .query(`SELECT * FROM CustMaster WHERE Email = @Email OR MobNo = @MobNo`);
 
         // Log the fetched user
         console.log(fetchUser.recordset.length);
 
-        if(fetchUser.recordset.length === 0) {
+        if (fetchUser.recordset.length === 0) {
             let result = await pool.request()
-                                .query(`SELECT MAX(Cust_ID) AS Last_Cust FROM CustMaster`)
+                .query(`SELECT MAX(Cust_ID) AS Last_Cust FROM CustMaster`)
 
             let Last_Cust = result.recordset[0].Last_Cust
             console.log(Last_Cust)
@@ -40,7 +41,7 @@ async function handleUserSignup(req, res) {
                 .input('Password', sql.VarChar, Password)
                 .input('Cat_ID', sql.Int, Cat_ID)
                 .query(`INSERT INTO CustMaster (Cust_ID, Name_of_Cust, MobNo, Email, Address, GSTNo, Password, Cat_ID) VALUES (@Cust_ID, @Name_of_Cust, @MobNo, @Email, @Address, @GSTNo, @Password, @Cat_ID)`)
-    
+
             // console.log(result)
             return res.status(200).send("Signup Successfully")
         } else {
@@ -57,7 +58,7 @@ async function handleUserLogin(req, res) {
     let Email = email
     let Password = password
     let MobNo = mobileno
-    console.log(Email, Password, MobNo)
+    // console.log(Email, MobNo)
     try {
         const pool = await connectDB()
 
@@ -84,6 +85,79 @@ async function handleUserLogin(req, res) {
         }
     } catch (err) {
         console.log(err)
+    }
+}
+
+async function handleForgetPassword(req, res) {
+    const { email } = req.body;
+
+    if (email) {
+        try {
+            const pool = await connectDB()
+
+            let result = await pool.request()
+                .input('email', sql.VarChar, email)
+                .query(`SELECT * FROM CustMaster WHERE Email = @email`)
+
+            if (result.recordset.length === 0) {
+                return res.send({message: "User doesn't not Exist"})
+            } else {
+                let OTP = getOTP();
+                console.log(OTP);
+
+                await handleSendEmail(email, "Your OTP", `OTP ${OTP}`).then((info) => {
+                    // console.log("Message sent:", info.messageId);
+                    storeOTP(email, OTP);
+                    res.send({message: "OTP Sended"});
+                }).catch((err) => {
+                    console.log(err);
+                })
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    } else {
+        console.log("email is not getting");
+        res.send({message: "email is not getting"})
+    }
+}
+
+async function handleCheckOTP(req, res) {
+    const { email, OTP } = req.body;
+
+    const verified = checkOTP(email, OTP)
+    console.log(verified);
+    if (verified) {
+        res.send({message: "OTP verified successfully"})
+    } else {
+        res.send({message: 'Invalid or expired OTP'});
+    }
+}
+
+async function resetPassword(req, res) {
+    const { email, newPassword, confirmPassword } = req.body;
+
+    try {
+        const pool = await connectDB()
+        const result = await pool.request()
+            .input('email', sql.VarChar, email)
+            .query(`SELECT * FROM CustMaster WHERE Email = @email`)
+
+        if (result.recordset.length === 0) {
+            return res.send({message: "User doesn't Exist"})
+        } else {
+            if (newPassword == confirmPassword) {
+                let setPassword = await pool.request()
+                    .input('email', sql.VarChar, email)
+                    .input('confirmPassword', sql.VarChar, confirmPassword)
+                    .query('UPDATE CustMaster SET Password = @confirmPassword WHERE Email = @email')
+                res.send({message: "Password Reset Successfully"});
+            } else {
+                res.status(400).send({message: "New Password and Confirm Password is not same"});
+            }
+        }
+    } catch (err) {
+        console.log(err);
     }
 }
 
@@ -124,4 +198,7 @@ async function handleLoginAll(req, res) {
 module.exports = {
     handleUserSignup,
     handleUserLogin,
+    handleForgetPassword,
+    handleCheckOTP,
+    resetPassword,
 }

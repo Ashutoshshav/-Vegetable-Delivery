@@ -25,7 +25,7 @@ const port = process.env.PORT || 3000;
 
 // Middleware configurations
 app.use(cors({
-    origin: ["http://192.168.0.252:3000", "http://localhost:3000", "http://localhost:5173"], // Allowed origins
+    origin: ["http://108.181.168.113:3000", "http://192.168.0.252:3000", "http://localhost:3000", "http://localhost:5173"], // Allowed origins
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed methods
     credentials: true // Allow credentials if needed
 }));
@@ -44,7 +44,7 @@ app.use("/api/cart/", handleVerifyUser, cartRoute);
 app.use("/api/order/", handleVerifyUser, orderRoute);
 app.use("/api/seller/", handleVerifyAdmin, sellerKPIRoute);
 app.use("/api/adminaccess/", handleVerifyAdmin, adminAccess);
-app.use("/", productRoute);
+app.use("/api/", productRoute);
 
 // Catch-all handler for any requests that don’t match an API route
 app.get('*', (req, res) => {

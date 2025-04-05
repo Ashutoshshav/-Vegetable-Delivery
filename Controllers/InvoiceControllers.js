@@ -83,10 +83,10 @@ async function handleInvoiceManagement() {
         const pool = await connectDB();
         let selectSKU_Pricingdaywise = await pool
             .request()
-            .query("SELECT * FROM SKU_Pricingdaywise");
+            .query("SELECT t.SKUID, t.Purchase_Amount, t.SKU_Name, t.Date FROM SKU_Pricingdaywise t INNER JOIN (SELECT SKUID, MAX(Date) AS latest_purchase_date FROM SKU_Pricingdaywise GROUP BY SKUID) latest_purchase ON t.SKUID = latest_purchase.SKUID AND t.Date = latest_purchase.latest_purchase_date;");
 
-        selectSKU_Pricingdaywise = selectSKU_Pricingdaywise.recordsets[0];
-        // console.log(selectSKU_Pricingdaywise)
+        selectSKU_Pricingdaywise = selectSKU_Pricingdaywise.recordset;
+        console.log(selectSKU_Pricingdaywise)
 
         const currentISTDate = moment.tz("Asia/Kolkata");
         // console.log(currentISTDate);
@@ -98,11 +98,11 @@ async function handleInvoiceManagement() {
             .request()
             .input("formattedDate", sql.Date, formattedDate)
             .query(
-                "SELECT * FROM Order_Data WHERE OrderDate = @formattedDate AND ((InvoiceGenerated = 0 OR InvoiceGenerated IS NULL) AND (OrderDeleted = 0 OR OrderDeleted IS NULL))"
+                "SELECT * FROM Order_Data WHERE OrderDate = @formattedDate AND Order_sts = 1 AND (InvoiceGenerated = 0 OR InvoiceGenerated IS NULL) AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
             );
 
         let orderData = selectCust_ID.recordset;
-        // console.log(orderData);
+        console.log(orderData);
 
         for (const element of orderData) {
             let Cust_ID = element.Cust_ID;
@@ -111,9 +111,7 @@ async function handleInvoiceManagement() {
             let fetchCat_ID = await pool
                 .request()
                 .input("Cust_ID", sql.Int, Cust_ID)
-                .query(
-                    "SELECT ISNULL(Cat_ID, 1) AS Cat_ID FROM CustMaster WHERE Cust_ID = @Cust_ID"
-                );
+                .query("SELECT ISNULL(Cat_ID, 1) AS Cat_ID FROM CustMaster WHERE Cust_ID = @Cust_ID");
 
             // Check if fetchCat_ID returned any results
             if (fetchCat_ID.recordsets[0] && fetchCat_ID.recordsets[0].length > 0) {
@@ -126,8 +124,8 @@ async function handleInvoiceManagement() {
                     .input("Cat_ID", sql.Int, Cat_ID)
                     .input('formattedDate', sql.Date, formattedDate)
                     .query(
-                        "UPDATE Order_Data SET CustCat_ID = @Cat_ID WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate"
-                    );
+                        "UPDATE Order_Data SET CustCat_ID = @Cat_ID WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1 AND (InvoiceGenerated = 0 OR InvoiceGenerated IS NULL) AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
+                );
 
                 let getMul_Fact = await pool
                     .request()
@@ -148,7 +146,7 @@ async function handleInvoiceManagement() {
                             .input("formattedDate", sql.Date, formattedDate)
                             .input("Purchase_Amount", sql.Float, Purchase_Amount)
                             .query(
-                                "UPDATE Order_Data SET Rate = @Purchase_Amount WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND OrderDate = @formattedDate AND Order_sts = 1"
+                                "UPDATE Order_Data SET Rate = @Purchase_Amount WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND OrderDate = @formattedDate AND Order_sts = 1 AND (InvoiceGenerated = 0 OR InvoiceGenerated IS NULL) AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
                             );
 
                         await pool
@@ -158,7 +156,7 @@ async function handleInvoiceManagement() {
                             .input("formattedDate", sql.Date, formattedDate)
                             .input("Purchase_Amount", sql.Float, Purchase_Amount)
                             .query(
-                                "UPDATE Order_Data SET Amount = Rate * Qty WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND OrderDate = @formattedDate AND Order_sts = 1"
+                                "UPDATE Order_Data SET Amount = Rate * Qty WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND OrderDate = @formattedDate AND Order_sts = 1 AND (InvoiceGenerated = 0 OR InvoiceGenerated IS NULL) AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
                             );
                     }
                 } else {
@@ -180,7 +178,7 @@ async function handleSetCustInvoice(req, res) {
     let Email = req.user.email;
     // console.log(Cust_ID)
     // console.log(Email)
-    await handleInvoiceManagement();
+    // await handleInvoiceManagement();
     const currentISTDate = moment.tz("Asia/Kolkata");
     // console.log(currentISTDate);
     let previousDay = currentISTDate.clone().subtract(1, "day");
@@ -195,7 +193,7 @@ async function handleSetCustInvoice(req, res) {
             .input("Cust_ID", sql.Int, Cust_ID)
             .input("formattedDate", sql.Date, formattedDate)
             .query(
-                "SELECT SUM(Amount) AS Total_Amount, DeliverySlot, OrderDate FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1 GROUP BY DeliverySlot, OrderDate"
+                "SELECT SUM(Amount) AS Total_Amount, DeliverySlot, OrderDate FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1 AND (OrderDeleted = 0 OR OrderDeleted IS NULL) GROUP BY DeliverySlot, OrderDate"
             );
 
         if (getTotalAmount.recordset.length === 0) {
@@ -207,6 +205,7 @@ async function handleSetCustInvoice(req, res) {
         let OrderDate = getTotalAmount.recordset[0].OrderDate;
 
         const newdate = new Date(OrderDate);
+        // console.log(newdate + "newdate"); // Output: "2024-10-04"
 
         // Extract the date parts
         const year = newdate.getFullYear();
@@ -214,7 +213,7 @@ async function handleSetCustInvoice(req, res) {
         const day = String(newdate.getDate()).padStart(2, "0");
 
         OrderDate = `${year}-${month}-${day}`;
-        // console.log(OrderDate); // Output: "2024-10-04"
+        // console.log(OrderDate + "OrderDate"); // Output: "2024-10-04"
         // console.log(Total_Amount)
         // console.log(DeliverySlot)
         // console.log(OrderDate)
@@ -234,7 +233,7 @@ async function handleSetCustInvoice(req, res) {
             .input("Cust_ID", sql.Int, Cust_ID)
             .input("formattedDate", sql.Date, formattedDate)
             .query(
-                "SELECT * FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1"
+                "SELECT * FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1 AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
             );
 
         // let setOrder_sts = await pool.request()
@@ -344,7 +343,7 @@ async function generateInvoicePDF(Cust_ID) {
             .input("Cust_ID", sql.Int, Cust_ID)
             .input("formattedDate", sql.Date, formattedDate)
             .query(
-                "SELECT * FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1"
+                "SELECT * FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @formattedDate AND Order_sts = 1 AND (OrderDeleted = 0 OR OrderDeleted IS NULL)"
             );
         const items = custInvoicedOrder.recordset;
         // console.log(items)
@@ -458,7 +457,7 @@ async function generateInvoicePDF(Cust_ID) {
 
 function scheduleInvoice() {
     cron.schedule(
-        "00 6 * * *",
+        "00 06 * * *",
         () => {
             handleGenerateInvoice();
         },

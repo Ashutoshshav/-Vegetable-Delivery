@@ -19,6 +19,7 @@ async function handleSubmitOrder(req, res) {
     let Cust_ID = req.user.id
     // console.log(Cust_ID)
     let { count, selectedSchedule } = req.body;
+    // console.log(count, selectedSchedule)
     
     let currentISTDate = moment.tz('Asia/Kolkata').format('YYYY-MM-DD');
     // console.log(currentISTDate)
@@ -29,13 +30,14 @@ async function handleSubmitOrder(req, res) {
 
         let lastOrderID = getLastOrderID.recordset[0].Last_OrderID
         // console.log(lastOrderID)
+        
         const result = await pool.request()
             .input('Cust_ID', sql.Int, Cust_ID)
-            .input('OrderDate', sql.Date, currentISTDate)
-            .query(`SELECT MAX(OrderID) AS Last_Order FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @OrderDate`);
+            .input('currentISTDate', sql.Date, currentISTDate)
+            .query(`SELECT MAX(OrderID) AS Last_Order FROM Order_Data WHERE Cust_ID = @Cust_ID AND OrderDate = @currentISTDate AND (OrderDeleted = 0 OR OrderDeleted IS NULL)`);
 
         let Last_Order = result.recordset[0].Last_Order || 0
-        // console.log(Last_Order)
+        // console.log(Last_Order + "Last_Order")
 
         let OrderDate = moment.tz('Asia/Kolkata').format('YYYY-MM-DD');
         // console.log(OrderDate)
@@ -48,6 +50,7 @@ async function handleSubmitOrder(req, res) {
         // console.log(OrderID)
         // console.log(OrderDtime)
         if(Last_Order > 0) {
+            console.log(Last_Order + "Last_Order")
             OrderID = Last_Order
 
             let LastEditOrderDtime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
@@ -56,6 +59,8 @@ async function handleSubmitOrder(req, res) {
 
             for (const item of count) {
                 let { SKUID } = item;
+                console.log(item);
+                
                 await pool.request()
                     .input('OrderID', sql.Int, OrderID)
                     .input('OrderDtime', sql.DateTimeOffset, OrderDtime)
@@ -66,17 +71,18 @@ async function handleSubmitOrder(req, res) {
                     .input('Cust_ID', sql.Int, Cust_ID)
                     .input('SKUID', sql.Int, SKUID)
                     .input('OrderDeleted', sql.Int, OrderDeleted)
-                    .query(`UPDATE Order_Data SET OrderID = @OrderID, OrderDtime = @OrderDtime, LastEditOrderDtime = @LastEditOrderDtime, OrderDate = @OrderDate, DeliverySlot = @DeliverySlot, Order_sts = @Order_sts, OrderDeleted = @OrderDeleted WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID`)
+                    .query(`UPDATE Order_Data SET OrderID = @OrderID, OrderDtime = @OrderDtime, LastEditOrderDtime = @LastEditOrderDtime, OrderDate = @OrderDate, DeliverySlot = @DeliverySlot, Order_sts = 1 WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND (OrderDeleted = 0 OR OrderDeleted IS NULL)`)
             }
         } else {
             OrderID = lastOrderID += 1
+            console.log(OrderID + "OrderID")
             let currentDateTime = new Date();
             let currentDateTimeIST = new Date(currentDateTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     
             // console.log(Cust_ID)
             // console.log(count)
-    
             for (const item of count) {
+                console.log(item);
                 let { SKUID } = item;
                 await pool.request()
                     .input('OrderID', sql.Int, OrderID)
@@ -87,7 +93,7 @@ async function handleSubmitOrder(req, res) {
                     .input('Cust_ID', sql.Int, Cust_ID)
                     .input('SKUID', sql.Int, SKUID)
                     .input('OrderDeleted', sql.Int, OrderDeleted)
-                    .query(`UPDATE Order_Data SET OrderID = @OrderID, OrderDtime = @OrderDtime, OrderDate = @OrderDate, DeliverySlot = @DeliverySlot, Order_sts = @Order_sts, OrderDeleted = @OrderDeleted WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID`)
+                    .query(`UPDATE Order_Data SET OrderID = @OrderID, OrderDtime = @OrderDtime, OrderDate = @OrderDate, DeliverySlot = @DeliverySlot, Order_sts = @Order_sts, OrderDeleted = @OrderDeleted WHERE Cust_ID = @Cust_ID AND SKUID = @SKUID AND (OrderDeleted = 0 OR OrderDeleted IS NULL)`)
             }
         }
 

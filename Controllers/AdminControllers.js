@@ -8,7 +8,7 @@ async function handleAdminLogin(req, res) {
     let Email = email
     let Password = password
     const Last_login = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
-    console.log(Last_login)
+    // console.log(Last_login)
 
     // console.log(Email, Password)
     try {

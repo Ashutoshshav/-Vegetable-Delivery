@@ -24,7 +24,7 @@ async function getProductOfCart(Cust_ID) {
     try {
         const pool = await connectDB()
 
-        const result = await pool.request().query(`SELECT * FROM Cart WHERE Cust_ID = ${Cust_ID}`)
+        const result = await pool.request().query(`SELECT * FROM Cart WHERE Cust_ID = ${Cust_ID} AND OrderDeleted = ${0}`)
         //console.log(result.recordset);
         
         return result.recordset;

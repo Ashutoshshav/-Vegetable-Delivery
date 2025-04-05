@@ -21,11 +21,11 @@ function generateDeliverySchedule() {
             {
               "id": 1,
               "startTime": "08:00 AM",
-              "endTime": "11:00 PM",
+              "endTime": "11:00 AM",
             },
             {
               "id": 2,
-              "startTime": "11:00 PM",
+              "startTime": "11:00 AM",
               "endTime": "02:00 PM",
             },
             {
@@ -43,7 +43,7 @@ function generateDeliverySchedule() {
         let deliveryDate = generateDeliveryDate()
         // console.log(deliveryDate)
 
-        console.log({deliveryTimes, deliveryDate})
+        // console.log({deliveryTimes, deliveryDate})
         return {deliveryTimes, deliveryDate}
     } catch(err) {
         console.log(err)

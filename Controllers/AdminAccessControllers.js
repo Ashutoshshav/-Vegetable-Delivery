@@ -172,6 +172,73 @@ async function handleAdminSignup(req, res) {
     }
 }
 
+async function handleGetTodayOrderDetails(req, res) {
+    let { selectedDateFromAdmin } = req.body;
+    try {
+        const pool = await connectDB();
+
+        // Query for individual order details
+        const orderDetailsResult = await pool.request()
+            .input('SelectedDate', sql.Date, selectedDateFromAdmin)
+            .query(`
+                SELECT 
+                    OrderID,
+                    Cust_ID,
+                    OrderDate,
+                    OrderDtime,
+                    DeliverySlot,
+                    STRING_AGG(SKUID, ', ') AS SKUID,
+                    STRING_AGG(SKUName, ', ') AS SKUName,
+                    STRING_AGG(CAST(Qty AS VARCHAR), ', ') AS Quantities
+                FROM 
+                    Order_Data
+                WHERE 
+                    OrderDate = @SelectedDate
+                    AND Order_sts = 1
+                    AND (OrderDeleted = 0 OR OrderDeleted IS NULL)
+                GROUP BY 
+                    OrderID, Cust_ID, OrderDate, OrderDtime, DeliverySlot
+                ORDER BY 
+                    OrderID;
+            `);
+
+        // Query for total quantity per SKU
+        const skuTotalsResult = await pool.request()
+            .input('SelectedDate', sql.Date, selectedDateFromAdmin)
+            .query(`
+                SELECT 
+                    SKUID,
+                    SKUName,
+                    SUM(Qty) AS TotalQuantity
+                FROM 
+                    Order_Data
+                WHERE 
+                    OrderDate = @SelectedDate
+                    AND Order_sts = 1
+                    AND (OrderDeleted = 0 OR OrderDeleted IS NULL)
+                GROUP BY 
+                    SKUID, SKUName
+                ORDER BY 
+                    SKUID;
+            `);
+
+        // Combine results
+        const placedOrders = orderDetailsResult.recordset;
+        const skuTotals = skuTotalsResult.recordset;
+
+        console.log("Order Details:", placedOrders);
+        console.log("SKU Totals:", skuTotals);
+
+        res.send({
+            placedOrders,
+            skuTotals
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).send("An error occurred while fetching order details.");
+    }
+}
+
 // async function hanbleSetDailyItemPrice(req, res) {
 //     let { SKUID, Purchase_Amount } = req.body;
 //     let currentDate = moment.tz('Asia/Kolkata').format('YYYY-MM-DD');
@@ -220,4 +287,5 @@ module.exports = {
     handleSetDisableButton,
     hanbleSetDailyItemPrice,
     handleAdminSignup,
+    handleGetTodayOrderDetails,
 }
